@@ -1,0 +1,17 @@
+[package]
+name = "slickit-crust-python"
+description = "SLICK Python crust — PyO3 bindings for slickit"
+version = "0.0.1-alpha.1"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/mox-labs/slick"
+authors = ["Yashodeep Vyas"]
+
+[lib]
+name = "slickit_py"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.25", features = ["extension-module"] }
+slickit = { path = "../..", features = ["manifest"] }
+serde_json = "1"

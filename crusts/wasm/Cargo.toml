@@ -1,0 +1,19 @@
+[package]
+name = "slickit-crust-wasm"
+description = "SLICK TypeScript crust — wasm-bindgen bindings for slickit"
+version = "0.0.1-alpha.1"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/mox-labs/slick"
+authors = ["Yashodeep Vyas"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+serde_json = "1"
+slickit = { path = "../..", features = ["manifest"] }
