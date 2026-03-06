@@ -2,4 +2,12 @@
 /dist
 *.whl
 *.egg-info
+*.so
+*.dylib
+*.pyd
+*.pyc
+__pycache__/
+*.dSYM/
+.venv/
+uv.lock
 scratch/
