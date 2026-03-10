@@ -1,11 +1,11 @@
 from ._native import (
-    ComponentKind,
-    ComponentManifest,
+    Kind,
+    Manifest,
     TypedConfig,
 )
 
 __all__ = [
-    "ComponentKind",
-    "ComponentManifest",
+    "Kind",
+    "Manifest",
     "TypedConfig",
 ]

@@ -4,10 +4,10 @@
 //!
 //! | Layer | Feature | Types | Consumer |
 //! |-------|---------|-------|----------|
-//! | Runtime (xDS) | default | [`TypedConfig`], [`TypedRegistry`], [`RegistryError`] | geist-edge |
-//! | Authoring (CRD) | `manifest` | [`ComponentKind`], [`ComponentManifest`] | Composer |
+//! | Runtime | default | [`TypedConfig`], [`TypedRegistry`], [`RegistryError`] | geist-edge |
+//! | Authoring | `manifest` | [`Kind`], [`Manifest`] | Composer |
 //!
-//! Bridge: `ComponentManifest.type_url` = `TypedConfig.type_url`.
+//! Bridge: `Manifest.type_url` = `TypedConfig.type_url`.
 //!
 //! Cross-surface: Rust is canonical. Crusts (PyO3, wasm-bindgen) expose
 //! identical types to Python and TypeScript.
@@ -38,4 +38,4 @@ pub use registry::{RegistryError, TypedConfig, TypedRegistry, TypedRegistryBuild
 pub mod manifest;
 
 #[cfg(feature = "manifest")]
-pub use manifest::{ComponentKind, ComponentManifest};
+pub use manifest::{Kind, Manifest};
