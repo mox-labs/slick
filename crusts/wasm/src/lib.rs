@@ -1,7 +1,7 @@
 //! slick-ts — TypeScript bindings for slickit via wasm-bindgen.
 //!
-//! Exposes SLICK's component type system to TypeScript/Svelte: ComponentKind,
-//! ComponentManifest, TypedConfig.
+//! Exposes SLICK's component type system to TypeScript/Svelte: Kind,
+//! Manifest, TypedConfig.
 //!
 //! Built with `wasm-pack build --target web`. Produces `.d.ts` type definitions
 //! alongside the WASM binary.
@@ -9,54 +9,54 @@
 use wasm_bindgen::prelude::*;
 
 // ═══════════════════════════════════════════════════════════════════════
-// ComponentKind
+// Kind
 // ═══════════════════════════════════════════════════════════════════════
 
-/// The 4 core component kinds.
+/// The 4 component kinds.
 #[wasm_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ComponentKind {
+pub enum Kind {
     Agent = 0,
     Capability = 1,
     Skill = 2,
     Flow = 3,
 }
 
-impl From<ComponentKind> for slick::ComponentKind {
-    fn from(kind: ComponentKind) -> Self {
+impl From<Kind> for slick::Kind {
+    fn from(kind: Kind) -> Self {
         match kind {
-            ComponentKind::Agent => Self::Agent,
-            ComponentKind::Capability => Self::Capability,
-            ComponentKind::Skill => Self::Skill,
-            ComponentKind::Flow => Self::Flow,
+            Kind::Agent => Self::Agent,
+            Kind::Capability => Self::Capability,
+            Kind::Skill => Self::Skill,
+            Kind::Flow => Self::Flow,
         }
     }
 }
 
-impl From<slick::ComponentKind> for ComponentKind {
-    fn from(kind: slick::ComponentKind) -> Self {
+impl From<slick::Kind> for Kind {
+    fn from(kind: slick::Kind) -> Self {
         match kind {
-            slick::ComponentKind::Agent => Self::Agent,
-            slick::ComponentKind::Capability => Self::Capability,
-            slick::ComponentKind::Skill => Self::Skill,
-            slick::ComponentKind::Flow => Self::Flow,
+            slick::Kind::Agent => Self::Agent,
+            slick::Kind::Capability => Self::Capability,
+            slick::Kind::Skill => Self::Skill,
+            slick::Kind::Flow => Self::Flow,
         }
     }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// ComponentManifest (opaque, JSON bridge)
+// Manifest (opaque, JSON bridge)
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Authoring-layer component manifest.
+/// Component manifest — describes a component for composition and discovery.
 #[wasm_bindgen]
-pub struct ComponentManifest {
-    inner: slick::ComponentManifest,
+pub struct Manifest {
+    inner: slick::Manifest,
 }
 
 #[wasm_bindgen]
-impl ComponentManifest {
-    /// Create a ComponentManifest from a JS object.
+impl Manifest {
+    /// Create a Manifest from a JS object.
     ///
     /// Expected shape:
     /// ```js
@@ -64,13 +64,14 @@ impl ComponentManifest {
     ///   kind: "agent" | "capability" | "skill" | "flow",
     ///   type_url: "mox.geist.processors.v1.AccessControl",
     ///   description: "...",
+    ///   invoke: "uvx mox/tools/access-control",  // optional
     ///   consumes: [],
     ///   produces: "..."
     /// }
     /// ```
     #[wasm_bindgen(js_name = "fromObject")]
-    pub fn from_object(obj: JsValue) -> Result<ComponentManifest, JsValue> {
-        let inner: slick::ComponentManifest = serde_wasm_bindgen::from_value(obj)
+    pub fn from_object(obj: JsValue) -> Result<Manifest, JsValue> {
+        let inner: slick::Manifest = serde_wasm_bindgen::from_value(obj)
             .map_err(|e| JsValue::from_str(&format!("invalid manifest: {e}")))?;
         Ok(Self { inner })
     }
@@ -84,8 +85,8 @@ impl ComponentManifest {
 
     /// Create from a JSON string.
     #[wasm_bindgen(js_name = "fromJson")]
-    pub fn from_json(json: &str) -> Result<ComponentManifest, JsValue> {
-        let inner: slick::ComponentManifest = serde_json::from_str(json)
+    pub fn from_json(json: &str) -> Result<Manifest, JsValue> {
+        let inner: slick::Manifest = serde_json::from_str(json)
             .map_err(|e| JsValue::from_str(&format!("invalid JSON: {e}")))?;
         Ok(Self { inner })
     }
@@ -99,7 +100,7 @@ impl ComponentManifest {
 
     /// Get the component kind.
     #[wasm_bindgen(getter)]
-    pub fn kind(&self) -> ComponentKind {
+    pub fn kind(&self) -> Kind {
         self.inner.kind.into()
     }
 
@@ -113,6 +114,12 @@ impl ComponentManifest {
     #[wasm_bindgen(getter)]
     pub fn description(&self) -> String {
         self.inner.description.clone()
+    }
+
+    /// Get the invoke incantation.
+    #[wasm_bindgen(getter)]
+    pub fn invoke(&self) -> Option<String> {
+        self.inner.invoke.clone()
     }
 }
 

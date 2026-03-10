@@ -14,9 +14,47 @@ permissions:
   contents: read
 
 jobs:
-  # ── Build wheels for each platform ────────────────────────────────
+  # ── Test before publishing ────────────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run tests
+        run: cargo test --all-features
+
+      - name: Clippy
+        run: cargo clippy --all-features -- -D warnings
+
+  # ── Publish to crates.io ──────────────────────────────────────────
+  crates:
+    name: Publish to crates.io
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish slickit
+        if: ${{ !inputs.dry-run }}
+        run: cargo publish --all-features
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Dry run
+        if: ${{ inputs.dry-run }}
+        run: cargo publish --all-features --dry-run
+
+  # ── Build Python wheels for each platform ─────────────────────────
   build:
     name: Build wheels (${{ matrix.target }})
+    needs: [test]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -61,6 +99,7 @@ jobs:
   # ── Build sdist ───────────────────────────────────────────────────
   sdist:
     name: Build sdist
+    needs: [test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -79,8 +118,8 @@ jobs:
           path: crusts/python/dist/*.tar.gz
 
   # ── Publish to PyPI ───────────────────────────────────────────────
-  publish:
-    name: Publish slickit to PyPI
+  pypi:
+    name: Publish to PyPI
     needs: [build, sdist]
     runs-on: ubuntu-latest
     permissions:
@@ -104,4 +143,46 @@ jobs:
 
       - name: Dry run
         if: ${{ inputs.dry-run }}
-        run: echo "Dry run — skipping publish"
+        run: echo "Dry run — skipping PyPI publish"
+
+  # ── Build and publish to npm ──────────────────────────────────────
+  npm:
+    name: Publish to npm
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build WASM package
+        run: wasm-pack build --target web
+        working-directory: crusts/wasm
+
+      - name: Set package name
+        working-directory: crusts/wasm/pkg
+        run: jq '.name = "slickit"' package.json > tmp.json && mv tmp.json package.json
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Publish to npm
+        if: ${{ !inputs.dry-run }}
+        run: npm publish --access public
+        working-directory: crusts/wasm/pkg
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Dry run
+        if: ${{ inputs.dry-run }}
+        run: npm publish --access public --dry-run
+        working-directory: crusts/wasm/pkg
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

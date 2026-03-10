@@ -1,7 +1,7 @@
 [package]
 name = "slickit-crust-wasm"
 description = "SLICK TypeScript crust — wasm-bindgen bindings for slickit"
-version = "0.0.1-alpha.1"
+version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/mox-labs/slick"

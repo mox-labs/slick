@@ -1,7 +1,6 @@
 //! slick — Python bindings for slickit via PyO3.
 //!
-//! Exposes SLICK's component type system to Python: ComponentKind,
-//! ComponentManifest, TypedConfig.
+//! Exposes SLICK's component type system to Python: Kind, Manifest, TypedConfig.
 //!
 //! Same types as the Rust canonical definitions, compiled into a native
 //! Python extension. No hand-maintained Python types — single source of truth.
@@ -10,13 +9,13 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 // ═══════════════════════════════════════════════════════════════════════
-// ComponentKind
+// Kind
 // ═══════════════════════════════════════════════════════════════════════
 
-/// The 4 core component kinds. Each implies a different runtime contract.
+/// The 4 component kinds. Each implies a different runtime contract.
 #[pyclass(frozen, eq, hash)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ComponentKind {
+pub enum Kind {
     /// Autonomous reasoning, session-based.
     Agent,
     /// Stateless function, single invocation.
@@ -28,13 +27,13 @@ pub enum ComponentKind {
 }
 
 #[pymethods]
-impl ComponentKind {
+impl Kind {
     fn __repr__(&self) -> &'static str {
         match self {
-            Self::Agent => "ComponentKind.Agent",
-            Self::Capability => "ComponentKind.Capability",
-            Self::Skill => "ComponentKind.Skill",
-            Self::Flow => "ComponentKind.Flow",
+            Self::Agent => "Kind.Agent",
+            Self::Capability => "Kind.Capability",
+            Self::Skill => "Kind.Skill",
+            Self::Flow => "Kind.Flow",
         }
     }
 
@@ -48,51 +47,53 @@ impl ComponentKind {
     }
 }
 
-impl From<ComponentKind> for slick::ComponentKind {
-    fn from(kind: ComponentKind) -> Self {
+impl From<Kind> for slick::Kind {
+    fn from(kind: Kind) -> Self {
         match kind {
-            ComponentKind::Agent => Self::Agent,
-            ComponentKind::Capability => Self::Capability,
-            ComponentKind::Skill => Self::Skill,
-            ComponentKind::Flow => Self::Flow,
+            Kind::Agent => Self::Agent,
+            Kind::Capability => Self::Capability,
+            Kind::Skill => Self::Skill,
+            Kind::Flow => Self::Flow,
         }
     }
 }
 
-impl From<slick::ComponentKind> for ComponentKind {
-    fn from(kind: slick::ComponentKind) -> Self {
+impl From<slick::Kind> for Kind {
+    fn from(kind: slick::Kind) -> Self {
         match kind {
-            slick::ComponentKind::Agent => Self::Agent,
-            slick::ComponentKind::Capability => Self::Capability,
-            slick::ComponentKind::Skill => Self::Skill,
-            slick::ComponentKind::Flow => Self::Flow,
+            slick::Kind::Agent => Self::Agent,
+            slick::Kind::Capability => Self::Capability,
+            slick::Kind::Skill => Self::Skill,
+            slick::Kind::Flow => Self::Flow,
         }
     }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// ComponentManifest
+// Manifest
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Authoring-layer component manifest (CRD equivalent).
+/// Component manifest — describes a component for composition and discovery.
 #[pyclass(frozen, get_all)]
 #[derive(Debug, Clone)]
-pub struct ComponentManifest {
-    pub kind: ComponentKind,
+pub struct Manifest {
+    pub kind: Kind,
     pub type_url: String,
     pub description: String,
+    pub invoke: Option<String>,
     pub consumes: Vec<String>,
     pub produces: Option<String>,
 }
 
 #[pymethods]
-impl ComponentManifest {
+impl Manifest {
     #[new]
-    #[pyo3(signature = (kind, type_url, description, consumes=None, produces=None))]
+    #[pyo3(signature = (kind, type_url, description, invoke=None, consumes=None, produces=None))]
     fn new(
-        kind: ComponentKind,
+        kind: Kind,
         type_url: String,
         description: String,
+        invoke: Option<String>,
         consumes: Option<Vec<String>>,
         produces: Option<String>,
     ) -> Self {
@@ -100,6 +101,7 @@ impl ComponentManifest {
             kind,
             type_url,
             description,
+            invoke,
             consumes: consumes.unwrap_or_default(),
             produces,
         }
@@ -115,14 +117,14 @@ impl ComponentManifest {
     /// Deserialize from JSON string.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: slick::ComponentManifest =
+        let inner: slick::Manifest =
             serde_json::from_str(json).map_err(|e| PyValueError::new_err(e.to_string()))?;
         Ok(from_inner_manifest(inner))
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "ComponentManifest(kind={}, type_url={:?})",
+            "Manifest(kind={}, type_url={:?})",
             self.kind.__str__(),
             self.type_url
         )
@@ -159,21 +161,23 @@ impl TypedConfig {
 // Conversion helpers (PyO3 ↔ slickit)
 // ═══════════════════════════════════════════════════════════════════════
 
-fn to_inner_manifest(m: &ComponentManifest) -> slick::ComponentManifest {
-    slick::ComponentManifest {
+fn to_inner_manifest(m: &Manifest) -> slick::Manifest {
+    slick::Manifest {
         kind: m.kind.into(),
         type_url: m.type_url.clone(),
         description: m.description.clone(),
+        invoke: m.invoke.clone(),
         consumes: m.consumes.clone(),
         produces: m.produces.clone(),
     }
 }
 
-fn from_inner_manifest(inner: slick::ComponentManifest) -> ComponentManifest {
-    ComponentManifest {
+fn from_inner_manifest(inner: slick::Manifest) -> Manifest {
+    Manifest {
         kind: inner.kind.into(),
         type_url: inner.type_url,
         description: inner.description,
+        invoke: inner.invoke,
         consumes: inner.consumes,
         produces: inner.produces,
     }
@@ -186,8 +190,8 @@ fn from_inner_manifest(inner: slick::ComponentManifest) -> ComponentManifest {
 /// Python module: `slickit._native`
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<ComponentKind>()?;
-    m.add_class::<ComponentManifest>()?;
+    m.add_class::<Kind>()?;
+    m.add_class::<Manifest>()?;
     m.add_class::<TypedConfig>()?;
     Ok(())
 }
