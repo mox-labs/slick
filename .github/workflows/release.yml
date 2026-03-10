@@ -146,46 +146,28 @@ jobs:
         run: echo "Dry run — skipping PyPI publish"
 
   # ── Build and publish to npm ──────────────────────────────────────
-  npm:
-    name: Publish to npm
-    needs: [test]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write  # npm provenance
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
-      - name: Build WASM package
-        run: wasm-pack build --target web
-        working-directory: crusts/wasm
-
-      - name: Set package name
-        working-directory: crusts/wasm/pkg
-        run: jq '.name = "slickit"' package.json > tmp.json && mv tmp.json package.json
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          registry-url: "https://registry.npmjs.org"
-
-      - name: Publish to npm
-        if: ${{ !inputs.dry-run }}
-        run: npm publish --access public --provenance
-        working-directory: crusts/wasm/pkg
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Dry run
-        if: ${{ inputs.dry-run }}
-        run: npm publish --access public --dry-run
-        working-directory: crusts/wasm/pkg
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+  # Disabled: npm 2FA/org setup blocking publish. Re-enable when sorted.
+  # npm:
+  #   name: Publish to npm
+  #   needs: [test]
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     id-token: write
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: dtolnay/rust-toolchain@stable
+  #     - run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+  #     - run: wasm-pack build --target web
+  #       working-directory: crusts/wasm
+  #     - working-directory: crusts/wasm/pkg
+  #       run: jq '.name = "slickit"' package.json > tmp.json && mv tmp.json package.json
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "22"
+  #         registry-url: "https://registry.npmjs.org"
+  #     - if: ${{ !inputs.dry-run }}
+  #       run: npm publish --access public --provenance
+  #       working-directory: crusts/wasm/pkg
+  #       env:
+  #         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
