@@ -86,7 +86,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.target }}
-          args: --release --out dist
+          args: --release --out dist -i python3.12
           manylinux: auto
           working-directory: crusts/python
 
@@ -150,6 +150,9 @@ jobs:
     name: Publish to npm
     needs: [test]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # npm provenance
     steps:
       - uses: actions/checkout@v4
 
@@ -175,7 +178,7 @@ jobs:
 
       - name: Publish to npm
         if: ${{ !inputs.dry-run }}
-        run: npm publish --access public
+        run: npm publish --access public --provenance
         working-directory: crusts/wasm/pkg
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
