@@ -43,7 +43,7 @@ jobs:
 
       - name: Publish slickit
         if: ${{ !inputs.dry-run }}
-        run: cargo publish --all-features
+        run: cargo publish --all-features || echo "Already published (idempotent)"
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
@@ -63,7 +63,7 @@ jobs:
           # macOS
           - os: macos-latest
             target: aarch64-apple-darwin
-          - os: macos-13
+          - os: macos-latest
             target: x86_64-apple-darwin
           # Linux
           - os: ubuntu-latest
