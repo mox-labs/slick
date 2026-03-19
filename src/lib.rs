@@ -4,10 +4,10 @@
 //!
 //! | Layer | Feature | Types | Consumer |
 //! |-------|---------|-------|----------|
-//! | Runtime | default | [`TypedConfig`], [`TypedRegistry`], [`RegistryError`] | geist-edge |
+//! | Runtime | default | [`TypedStruct`], [`TypedRegistry`], [`RegistryError`] | geist-edge |
 //! | Authoring | `manifest` | [`Kind`], [`Manifest`] | Composer |
 //!
-//! Bridge: `Manifest.type_url` = `TypedConfig.type_url`.
+//! Bridge: `Manifest.type_url` = `TypedStruct.type_url`.
 //!
 //! Cross-surface: Rust is canonical. Crusts (PyO3, wasm-bindgen) expose
 //! identical types to Python and TypeScript.
@@ -15,7 +15,7 @@
 //! # Example (runtime layer)
 //!
 //! ```
-//! use slick::{TypedConfig, TypedRegistryBuilder};
+//! use slick::{TypedStruct, TypedRegistryBuilder};
 //!
 //! let registry = TypedRegistryBuilder::<String, String>::new()
 //!     .register("example.v1", |value| {
@@ -25,14 +25,14 @@
 //!     })
 //!     .build();
 //!
-//! let config = serde_json::json!("hello");
-//! let instance = registry.create("example.v1", &config).unwrap();
+//! let val = serde_json::json!("hello");
+//! let instance = registry.create("example.v1", &val).unwrap();
 //! assert_eq!(instance, "hello");
 //! ```
 
 mod registry;
 
-pub use registry::{RegistryError, TypedConfig, TypedRegistry, TypedRegistryBuilder};
+pub use registry::{RegistryError, TypedRegistry, TypedRegistryBuilder, TypedStruct};
 
 #[cfg(feature = "manifest")]
 pub mod manifest;

@@ -7,7 +7,7 @@ Semantic, LLM-Interpretable Component Kit. Foundation types for composable compo
 Four types that let components describe themselves and be discovered, composed, and instantiated across languages:
 
 - **`Kind`** — Agent, Capability, Skill, Flow
-- **`Manifest`** — component descriptor (identity, kind, invoke, contracts)
+- **`Manifest`** — component descriptor (identity, kind, invoke, requires/provides contracts)
 - **`TypedConfig`** — config envelope (type_url + opaque JSON)
 - **`TypedRegistry`** — type_url → factory → instance
 
@@ -22,7 +22,7 @@ cargo add slickit --features manifest
 # Python
 pip install slickit
 
-# TypeScript
+# TypeScript (npm publish pending)
 bun add slickit
 ```
 
@@ -39,8 +39,8 @@ let manifest = Manifest {
     type_url: "mox.tools.v1.Recon".into(),
     description: "Reconnaissance and information gathering".into(),
     invoke: Some("uvx mox/tools/recon".into()),
-    consumes: vec!["mox.v1.Target".into()],
-    produces: Some("mox.v1.ReconReport".into()),
+    requires: vec!["mox.v1.Target".into()],
+    provides: vec!["mox.v1.ReconReport".into()],
 };
 
 // Register and instantiate
@@ -64,6 +64,8 @@ manifest = Manifest(
     type_url="mox.tools.v1.Recon",
     description="Reconnaissance and information gathering",
     invoke="uvx mox/tools/recon",
+    requires=["mox.v1.Target"],
+    provides=["mox.v1.ReconReport"],
 )
 
 # Serialize / deserialize
@@ -81,8 +83,8 @@ const manifest = Manifest.fromObject({
     type_url: "mox.tools.v1.Recon",
     description: "Reconnaissance and information gathering",
     invoke: "uvx mox/tools/recon",
-    consumes: ["mox.v1.Target"],
-    produces: "mox.v1.ReconReport",
+    requires: ["mox.v1.Target"],
+    provides: ["mox.v1.ReconReport"],
 });
 
 console.log(manifest.typeUrl); // "mox.tools.v1.Recon"
@@ -95,7 +97,7 @@ console.log(manifest.typeUrl); // "mox.tools.v1.Recon"
 | **Agent** | Autonomous reasoning, session-based | Code review agent |
 | **Capability** | Stateless function, single invocation | Access control processor |
 | **Skill** | Knowledge/context, no execution | Design tokens |
-| **Flow** | Orchestrated DAG of components | CI pipeline |
+| **Flow** | Orchestrated composition of components | CI pipeline |
 
 ## Dependencies
 

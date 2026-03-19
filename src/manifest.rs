@@ -1,7 +1,7 @@
 //! SLICK component manifest — authoring-layer types.
 //!
 //! These types describe components at authoring time: what kind they are,
-//! what they consume and produce, and how to invoke them. The runtime layer
+//! what they require and provide, and how to invoke them. The runtime layer
 //! ([`super::TypedConfig`], [`super::TypedRegistry`]) instantiates them.
 //!
 //! | Layer | Types | Purpose |
@@ -35,7 +35,7 @@ pub enum Kind {
     Capability,
     /// Knowledge and context. Loaded into working memory, not executed.
     Skill,
-    /// Orchestrated multi-step process. DAG with consumes/produces contracts.
+    /// Orchestrated multi-step process. Composition with requires/provides contracts.
     Flow,
 }
 
@@ -66,8 +66,8 @@ impl fmt::Display for Kind {
 ///     type_url: "mox.geist.processors.v1.AccessControl".into(),
 ///     description: "Deny-first access control processor".into(),
 ///     invoke: Some("uvx mox/tools/access-control".into()),
-///     consumes: vec![],
-///     produces: Some("mox.geist.v1.AuthResult".into()),
+///     requires: vec![],
+///     provides: vec!["mox.geist.v1.AuthResult".into()],
 /// };
 ///
 /// assert_eq!(manifest.kind, Kind::Capability);
@@ -86,10 +86,10 @@ pub struct Manifest {
     pub invoke: Option<String>,
     /// Input type URLs this component requires.
     #[serde(default)]
-    pub consumes: Vec<String>,
-    /// Output type URL this component produces. `None` for Skills (context only).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub produces: Option<String>,
+    pub requires: Vec<String>,
+    /// Output type URLs this component provides. Empty for Skills (context only).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub provides: Vec<String>,
 }
 
 #[cfg(test)]
@@ -140,8 +140,8 @@ mod tests {
             type_url: "mox.geist.processors.v1.AccessControl".into(),
             description: "Deny-first access control".into(),
             invoke: Some("uvx mox/tools/access-control".into()),
-            consumes: vec![],
-            produces: Some("mox.geist.v1.AuthResult".into()),
+            requires: vec![],
+            provides: vec!["mox.geist.v1.AuthResult".into()],
         };
 
         let json = serde_json::to_string_pretty(&manifest).unwrap();
@@ -149,7 +149,7 @@ mod tests {
         assert_eq!(back.kind, Kind::Capability);
         assert_eq!(back.type_url, "mox.geist.processors.v1.AccessControl");
         assert_eq!(back.invoke.as_deref(), Some("uvx mox/tools/access-control"));
-        assert_eq!(back.produces.as_deref(), Some("mox.geist.v1.AuthResult"));
+        assert_eq!(back.provides, vec!["mox.geist.v1.AuthResult"]);
     }
 
     #[test]
@@ -162,8 +162,8 @@ mod tests {
         let manifest: Manifest = serde_json::from_str(json).unwrap();
         assert_eq!(manifest.kind, Kind::Skill);
         assert!(manifest.invoke.is_none());
-        assert!(manifest.consumes.is_empty());
-        assert!(manifest.produces.is_none());
+        assert!(manifest.requires.is_empty());
+        assert!(manifest.provides.is_empty());
     }
 
     #[test]
@@ -173,26 +173,26 @@ mod tests {
             type_url: "mox.hud.adapters.v1.Cloudflare".into(),
             description: "Cloudflare runtime adapter".into(),
             invoke: Some("uvx mox/tools/cloudflare-adapter".into()),
-            consumes: vec![],
-            produces: Some("mox.hud.v1.Plane".into()),
+            requires: vec![],
+            provides: vec!["mox.hud.v1.Plane".into()],
         };
         assert_eq!(manifest.kind, Kind::Agent);
         assert!(manifest.invoke.is_some());
     }
 
     #[test]
-    fn flow_manifest_with_consumes_produces() {
+    fn flow_manifest_with_requires_provides() {
         let manifest = Manifest {
             kind: Kind::Flow,
             type_url: "ix.v1.ExperimentFlow".into(),
             description: "Probe → trial → sensor → reading".into(),
             invoke: None,
-            consumes: vec!["ix.v1.Probes".into(), "ix.v1.Subject".into()],
-            produces: Some("ix.v1.Readings".into()),
+            requires: vec!["ix.v1.Probes".into(), "ix.v1.Subject".into()],
+            provides: vec!["ix.v1.Readings".into()],
         };
 
-        assert_eq!(manifest.consumes.len(), 2);
-        assert_eq!(manifest.produces.as_deref(), Some("ix.v1.Readings"));
+        assert_eq!(manifest.requires.len(), 2);
+        assert_eq!(manifest.provides, vec!["ix.v1.Readings"]);
         assert!(manifest.invoke.is_none()); // Flows are config, not CLI tools
     }
 
@@ -203,12 +203,12 @@ mod tests {
             type_url: "mox.hud.panels.v1.NavPanel".into(),
             description: "File tree explorer panel".into(),
             invoke: None,
-            consumes: vec!["mox.hud.v1.Plane".into()],
-            produces: Some("mox.hud.v1.PanelRender".into()),
+            requires: vec!["mox.hud.v1.Plane".into()],
+            provides: vec!["mox.hud.v1.PanelRender".into()],
         };
 
         assert_eq!(manifest.kind, Kind::Capability);
-        assert_eq!(manifest.consumes.len(), 1);
+        assert_eq!(manifest.requires.len(), 1);
     }
 
     #[test]
@@ -218,16 +218,16 @@ mod tests {
             type_url: "mox.geist.processors.v1.AccessControl".into(),
             description: "Access control".into(),
             invoke: None,
-            consumes: vec![],
-            produces: None,
+            requires: vec![],
+            provides: vec![],
         };
 
-        let config = crate::TypedConfig {
+        let ts = crate::TypedStruct {
             type_url: "mox.geist.processors.v1.AccessControl".into(),
-            config: serde_json::json!({"default_action": "deny"}),
+            value: serde_json::json!({"default_action": "deny"}),
         };
 
-        assert_eq!(manifest.type_url, config.type_url);
+        assert_eq!(manifest.type_url, ts.type_url);
     }
 
     #[test]
@@ -237,11 +237,12 @@ mod tests {
             type_url: "slick.v1.DesignTokens".into(),
             description: "Brand design tokens".into(),
             invoke: None,
-            consumes: vec![],
-            produces: None,
+            requires: vec![],
+            provides: vec![],
         };
 
         let json = serde_json::to_string(&manifest).unwrap();
         assert!(!json.contains("invoke"));
+        assert!(!json.contains("provides"));
     }
 }

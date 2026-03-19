@@ -32,12 +32,12 @@ Component descriptor for composition and discovery:
 
 ```rust
 pub struct Manifest {
-    pub type_url: String,           // globally unique identity
     pub kind: Kind,                 // Agent | Capability | Skill | Flow
+    pub type_url: String,           // globally unique identity
     pub description: String,        // human + LLM readable
     pub invoke: Option<String>,     // execution incantation, opaque to SLICK
-    pub consumes: Vec<String>,      // input type_urls
-    pub produces: Option<String>,   // output type_url
+    pub requires: Vec<String>,      // input type_urls
+    pub provides: Vec<String>,      // output type_urls
 }
 ```
 
@@ -48,7 +48,7 @@ pub struct Manifest {
 | Agent | Autonomous reasoning, session-based |
 | Capability | Stateless function, single invocation |
 | Skill | Knowledge/context, no execution |
-| Flow | Orchestrated DAG of components |
+| Flow | Orchestrated composition of components |
 
 ### Crusts
 
