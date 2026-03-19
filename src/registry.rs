@@ -6,19 +6,19 @@
 use std::collections::HashMap;
 use std::fmt;
 
-/// A typed config entry from pipeline configuration.
+/// Typed structured data envelope — a type URL plus an opaque value.
 ///
-/// Same shape as Envoy's `TypedExtensionConfig`: a type URL that identifies
-/// the factory, and an opaque config blob deserialized by the factory.
+/// Isomorphic to xDS `TypedStruct`: a type URL that identifies the schema,
+/// and a structured value interpreted by the consumer (factory, runtime, etc.).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct TypedConfig {
-    /// Factory lookup key (e.g. `mox.geist.processors.v1.AccessControl`).
+pub struct TypedStruct {
+    /// Type URL identifying the schema (e.g. `mox.geist.processors.v1.AccessControl`).
     pub type_url: String,
-    /// Opaque config — each factory deserializes into its own type.
-    pub config: serde_json::Value,
+    /// Opaque structured value — interpretation determined by the type_url consumer.
+    pub value: serde_json::Value,
 }
 
-/// Error returned by [`TypedRegistry::create`] and [`TypedRegistry::create_pipeline`].
+/// Error returned by [`TypedRegistry::create`] and [`TypedRegistry::create_all`].
 #[derive(Debug)]
 pub enum RegistryError<E> {
     /// No factory registered for this type URL.
@@ -132,7 +132,7 @@ impl<T, E> TypedRegistry<T, E> {
     pub fn create(
         &self,
         type_url: &str,
-        config: &serde_json::Value,
+        value: &serde_json::Value,
     ) -> Result<T, RegistryError<E>> {
         let factory = self.factories.get(type_url).ok_or_else(|| {
             RegistryError::UnknownTypeUrl {
@@ -140,20 +140,20 @@ impl<T, E> TypedRegistry<T, E> {
                 available: self.type_urls_owned(),
             }
         })?;
-        factory(config).map_err(|source| RegistryError::Factory {
+        factory(value).map_err(|source| RegistryError::Factory {
             type_url: type_url.to_owned(),
             source,
         })
     }
 
-    /// Instantiate values from a list of typed config entries.
-    pub fn create_pipeline(
+    /// Instantiate values from a list of typed struct entries.
+    pub fn create_all(
         &self,
-        configs: &[TypedConfig],
+        entries: &[TypedStruct],
     ) -> Result<Vec<T>, RegistryError<E>> {
-        configs
+        entries
             .iter()
-            .map(|tc| self.create(&tc.type_url, &tc.config))
+            .map(|tc| self.create(&tc.type_url, &tc.value))
             .collect()
     }
 
@@ -316,45 +316,45 @@ mod tests {
     // -- Pipeline tests --
 
     #[test]
-    fn create_pipeline_success() {
+    fn create_all_success() {
         let registry = TypedRegistryBuilder::<String, String>::new()
             .register("test.echo.v1", echo_factory)
             .register("test.int.v1", int_factory)
             .build();
 
         let configs = vec![
-            TypedConfig {
+            TypedStruct {
                 type_url: "test.echo.v1".into(),
-                config: serde_json::json!("hi"),
+                value: serde_json::json!("hi"),
             },
-            TypedConfig {
+            TypedStruct {
                 type_url: "test.int.v1".into(),
-                config: serde_json::json!(42),
+                value: serde_json::json!(42),
             },
         ];
 
-        let pipeline = registry.create_pipeline(&configs).unwrap();
+        let pipeline = registry.create_all(&configs).unwrap();
         assert_eq!(pipeline, vec!["hi", "int:42"]);
     }
 
     #[test]
-    fn create_pipeline_fails_on_unknown() {
+    fn create_all_fails_on_unknown() {
         let registry = TypedRegistryBuilder::<String, String>::new()
             .register("test.echo.v1", echo_factory)
             .build();
 
         let configs = vec![
-            TypedConfig {
+            TypedStruct {
                 type_url: "test.echo.v1".into(),
-                config: serde_json::json!("hi"),
+                value: serde_json::json!("hi"),
             },
-            TypedConfig {
+            TypedStruct {
                 type_url: "test.missing.v1".into(),
-                config: serde_json::json!(null),
+                value: serde_json::json!(null),
             },
         ];
 
-        let err = registry.create_pipeline(&configs).unwrap_err();
+        let err = registry.create_all(&configs).unwrap_err();
         assert!(matches!(err, RegistryError::UnknownTypeUrl { .. }));
     }
 
@@ -368,27 +368,27 @@ mod tests {
         assert!(registry.type_urls().is_empty());
     }
 
-    // -- TypedConfig deserialization --
+    // -- TypedStruct deserialization --
 
     #[test]
-    fn typed_config_deserializes() {
+    fn typed_struct_deserializes() {
         let json =
-            r#"{"type_url": "mox.geist.processors.v1.Test", "config": {"key": "value"}}"#;
-        let tc: TypedConfig = serde_json::from_str(json).unwrap();
+            r#"{"type_url": "mox.geist.processors.v1.Test", "value": {"key": "value"}}"#;
+        let tc: TypedStruct = serde_json::from_str(json).unwrap();
         assert_eq!(tc.type_url, "mox.geist.processors.v1.Test");
-        assert_eq!(tc.config["key"], "value");
+        assert_eq!(tc.value["key"], "value");
     }
 
     #[test]
-    fn typed_config_serializes_roundtrip() {
-        let tc = TypedConfig {
+    fn typed_struct_serializes_roundtrip() {
+        let tc = TypedStruct {
             type_url: "test.v1".into(),
-            config: serde_json::json!({"a": 1}),
+            value: serde_json::json!({"a": 1}),
         };
         let json = serde_json::to_string(&tc).unwrap();
-        let tc2: TypedConfig = serde_json::from_str(&json).unwrap();
+        let tc2: TypedStruct = serde_json::from_str(&json).unwrap();
         assert_eq!(tc2.type_url, "test.v1");
-        assert_eq!(tc2.config, serde_json::json!({"a": 1}));
+        assert_eq!(tc2.value, serde_json::json!({"a": 1}));
     }
 
     // -- Display --

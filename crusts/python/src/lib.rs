@@ -1,6 +1,6 @@
 //! slick — Python bindings for slickit via PyO3.
 //!
-//! Exposes SLICK's component type system to Python: Kind, Manifest, TypedConfig.
+//! Exposes SLICK's component type system to Python: Kind, Manifest, TypedStruct.
 //!
 //! Same types as the Rust canonical definitions, compiled into a native
 //! Python extension. No hand-maintained Python types — single source of truth.
@@ -81,29 +81,29 @@ pub struct Manifest {
     pub type_url: String,
     pub description: String,
     pub invoke: Option<String>,
-    pub consumes: Vec<String>,
-    pub produces: Option<String>,
+    pub requires: Vec<String>,
+    pub provides: Vec<String>,
 }
 
 #[pymethods]
 impl Manifest {
     #[new]
-    #[pyo3(signature = (kind, type_url, description, invoke=None, consumes=None, produces=None))]
+    #[pyo3(signature = (kind, type_url, description, invoke=None, requires=None, provides=None))]
     fn new(
         kind: Kind,
         type_url: String,
         description: String,
         invoke: Option<String>,
-        consumes: Option<Vec<String>>,
-        produces: Option<String>,
+        requires: Option<Vec<String>>,
+        provides: Option<Vec<String>>,
     ) -> Self {
         Self {
             kind,
             type_url,
             description,
             invoke,
-            consumes: consumes.unwrap_or_default(),
-            produces,
+            requires: requires.unwrap_or_default(),
+            provides: provides.unwrap_or_default(),
         }
     }
 
@@ -132,28 +132,28 @@ impl Manifest {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// TypedConfig
+// TypedStruct
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Config envelope: type URL + opaque config JSON.
+/// Typed structured data envelope: type URL + opaque JSON value.
 #[pyclass(frozen, get_all)]
 #[derive(Debug, Clone)]
-pub struct TypedConfig {
+pub struct TypedStruct {
     pub type_url: String,
-    pub config: String, // JSON string (opaque to Python)
+    pub value: String, // JSON string (opaque to Python)
 }
 
 #[pymethods]
-impl TypedConfig {
+impl TypedStruct {
     #[new]
-    fn new(type_url: String, config: String) -> PyResult<Self> {
-        let _: serde_json::Value = serde_json::from_str(&config)
-            .map_err(|e| PyValueError::new_err(format!("invalid JSON config: {e}")))?;
-        Ok(Self { type_url, config })
+    fn new(type_url: String, value: String) -> PyResult<Self> {
+        let _: serde_json::Value = serde_json::from_str(&value)
+            .map_err(|e| PyValueError::new_err(format!("invalid JSON value: {e}")))?;
+        Ok(Self { type_url, value })
     }
 
     fn __repr__(&self) -> String {
-        format!("TypedConfig(type_url={:?})", self.type_url)
+        format!("TypedStruct(type_url={:?})", self.type_url)
     }
 }
 
@@ -167,8 +167,8 @@ fn to_inner_manifest(m: &Manifest) -> slick::Manifest {
         type_url: m.type_url.clone(),
         description: m.description.clone(),
         invoke: m.invoke.clone(),
-        consumes: m.consumes.clone(),
-        produces: m.produces.clone(),
+        requires: m.requires.clone(),
+        provides: m.provides.clone(),
     }
 }
 
@@ -178,8 +178,8 @@ fn from_inner_manifest(inner: slick::Manifest) -> Manifest {
         type_url: inner.type_url,
         description: inner.description,
         invoke: inner.invoke,
-        consumes: inner.consumes,
-        produces: inner.produces,
+        requires: inner.requires,
+        provides: inner.provides,
     }
 }
 
@@ -192,6 +192,6 @@ fn from_inner_manifest(inner: slick::Manifest) -> Manifest {
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Kind>()?;
     m.add_class::<Manifest>()?;
-    m.add_class::<TypedConfig>()?;
+    m.add_class::<TypedStruct>()?;
     Ok(())
 }

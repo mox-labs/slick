@@ -1,7 +1,7 @@
 //! slick-ts — TypeScript bindings for slickit via wasm-bindgen.
 //!
 //! Exposes SLICK's component type system to TypeScript/Svelte: Kind,
-//! Manifest, TypedConfig.
+//! Manifest, TypedStruct.
 //!
 //! Built with `wasm-pack build --target web`. Produces `.d.ts` type definitions
 //! alongside the WASM binary.
@@ -65,8 +65,8 @@ impl Manifest {
     ///   type_url: "mox.geist.processors.v1.AccessControl",
     ///   description: "...",
     ///   invoke: "uvx mox/tools/access-control",  // optional
-    ///   consumes: [],
-    ///   produces: "..."
+    ///   requires: [],
+    ///   provides: ["mox.geist.v1.AuthResult"]
     /// }
     /// ```
     #[wasm_bindgen(js_name = "fromObject")]
@@ -124,21 +124,21 @@ impl Manifest {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// TypedConfig
+// TypedStruct
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Config envelope: type URL + opaque config.
+/// Typed structured data envelope: type URL + opaque value.
 #[wasm_bindgen]
-pub struct TypedConfig {
-    inner: slick::TypedConfig,
+pub struct TypedStruct {
+    inner: slick::TypedStruct,
 }
 
 #[wasm_bindgen]
-impl TypedConfig {
-    /// Create from a JS object { type_url: string, config: any }.
+impl TypedStruct {
+    /// Create from a JS object { type_url: string, value: any }.
     #[wasm_bindgen(js_name = "fromObject")]
-    pub fn from_object(obj: JsValue) -> Result<TypedConfig, JsValue> {
-        let inner: slick::TypedConfig = serde_wasm_bindgen::from_value(obj)
+    pub fn from_object(obj: JsValue) -> Result<TypedStruct, JsValue> {
+        let inner: slick::TypedStruct = serde_wasm_bindgen::from_value(obj)
             .map_err(|e| JsValue::from_str(&format!("invalid config: {e}")))?;
         Ok(Self { inner })
     }
