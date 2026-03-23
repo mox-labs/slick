@@ -1,54 +1,15 @@
 //! slick-ts — TypeScript bindings for slickit via wasm-bindgen.
 //!
-//! Exposes SLICK's component type system to TypeScript/Svelte: Kind,
+//! Exposes SLICK's component type system to TypeScript/Svelte:
 //! Manifest, TypedStruct.
-//!
-//! Built with `wasm-pack build --target web`. Produces `.d.ts` type definitions
-//! alongside the WASM binary.
 
 use wasm_bindgen::prelude::*;
-
-// ═══════════════════════════════════════════════════════════════════════
-// Kind
-// ═══════════════════════════════════════════════════════════════════════
-
-/// The 4 component kinds.
-#[wasm_bindgen]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Kind {
-    Agent = 0,
-    Capability = 1,
-    Skill = 2,
-    Flow = 3,
-}
-
-impl From<Kind> for slick::Kind {
-    fn from(kind: Kind) -> Self {
-        match kind {
-            Kind::Agent => Self::Agent,
-            Kind::Capability => Self::Capability,
-            Kind::Skill => Self::Skill,
-            Kind::Flow => Self::Flow,
-        }
-    }
-}
-
-impl From<slick::Kind> for Kind {
-    fn from(kind: slick::Kind) -> Self {
-        match kind {
-            slick::Kind::Agent => Self::Agent,
-            slick::Kind::Capability => Self::Capability,
-            slick::Kind::Skill => Self::Skill,
-            slick::Kind::Flow => Self::Flow,
-        }
-    }
-}
 
 // ═══════════════════════════════════════════════════════════════════════
 // Manifest (opaque, JSON bridge)
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Component manifest — describes a component for composition and discovery.
+/// Component manifest — the structural surface for composition and discovery.
 #[wasm_bindgen]
 pub struct Manifest {
     inner: slick::Manifest,
@@ -61,12 +22,11 @@ impl Manifest {
     /// Expected shape:
     /// ```js
     /// {
-    ///   kind: "agent" | "capability" | "skill" | "flow",
-    ///   type_url: "mox.geist.processors.v1.AccessControl",
-    ///   description: "...",
-    ///   invoke: "uvx mox/tools/access-control",  // optional
-    ///   requires: [],
-    ///   provides: ["mox.geist.v1.AuthResult"]
+    ///   type_url: "cix.commands.v1.Recon",
+    ///   source: "git+https://github.com/mox-labs/tools/recon",
+    ///   requires: ["cix.v1.Target"],
+    ///   provides: ["cix.v1.ReconReport"],
+    ///   relations: { skills: ["git+https://github.com/mox-labs/skills/recon"] }
     /// }
     /// ```
     #[wasm_bindgen(js_name = "fromObject")]
@@ -98,28 +58,16 @@ impl Manifest {
             .map_err(|e| JsValue::from_str(&format!("serialization failed: {e}")))
     }
 
-    /// Get the component kind.
-    #[wasm_bindgen(getter)]
-    pub fn kind(&self) -> Kind {
-        self.inner.kind.into()
-    }
-
     /// Get the type URL.
     #[wasm_bindgen(getter, js_name = "typeUrl")]
     pub fn type_url(&self) -> String {
         self.inner.type_url.clone()
     }
 
-    /// Get the description.
+    /// Get the source location.
     #[wasm_bindgen(getter)]
-    pub fn description(&self) -> String {
-        self.inner.description.clone()
-    }
-
-    /// Get the invoke incantation.
-    #[wasm_bindgen(getter)]
-    pub fn invoke(&self) -> Option<String> {
-        self.inner.invoke.clone()
+    pub fn source(&self) -> String {
+        self.inner.source.clone()
     }
 }
 
@@ -139,7 +87,7 @@ impl TypedStruct {
     #[wasm_bindgen(js_name = "fromObject")]
     pub fn from_object(obj: JsValue) -> Result<TypedStruct, JsValue> {
         let inner: slick::TypedStruct = serde_wasm_bindgen::from_value(obj)
-            .map_err(|e| JsValue::from_str(&format!("invalid config: {e}")))?;
+            .map_err(|e| JsValue::from_str(&format!("invalid typed struct: {e}")))?;
         Ok(Self { inner })
     }
 

@@ -1,109 +1,43 @@
 //! slick — Python bindings for slickit via PyO3.
 //!
-//! Exposes SLICK's component type system to Python: Kind, Manifest, TypedStruct.
-//!
-//! Same types as the Rust canonical definitions, compiled into a native
-//! Python extension. No hand-maintained Python types — single source of truth.
+//! Exposes SLICK's component type system to Python: Manifest, TypedStruct.
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-
-// ═══════════════════════════════════════════════════════════════════════
-// Kind
-// ═══════════════════════════════════════════════════════════════════════
-
-/// The 4 component kinds. Each implies a different runtime contract.
-#[pyclass(frozen, eq, hash)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Kind {
-    /// Autonomous reasoning, session-based.
-    Agent,
-    /// Stateless function, single invocation.
-    Capability,
-    /// Knowledge/context, no execution.
-    Skill,
-    /// Orchestrated DAG, artifact ledger.
-    Flow,
-}
-
-#[pymethods]
-impl Kind {
-    fn __repr__(&self) -> &'static str {
-        match self {
-            Self::Agent => "Kind.Agent",
-            Self::Capability => "Kind.Capability",
-            Self::Skill => "Kind.Skill",
-            Self::Flow => "Kind.Flow",
-        }
-    }
-
-    fn __str__(&self) -> &'static str {
-        match self {
-            Self::Agent => "agent",
-            Self::Capability => "capability",
-            Self::Skill => "skill",
-            Self::Flow => "flow",
-        }
-    }
-}
-
-impl From<Kind> for slick::Kind {
-    fn from(kind: Kind) -> Self {
-        match kind {
-            Kind::Agent => Self::Agent,
-            Kind::Capability => Self::Capability,
-            Kind::Skill => Self::Skill,
-            Kind::Flow => Self::Flow,
-        }
-    }
-}
-
-impl From<slick::Kind> for Kind {
-    fn from(kind: slick::Kind) -> Self {
-        match kind {
-            slick::Kind::Agent => Self::Agent,
-            slick::Kind::Capability => Self::Capability,
-            slick::Kind::Skill => Self::Skill,
-            slick::Kind::Flow => Self::Flow,
-        }
-    }
-}
+use std::collections::HashMap;
 
 // ═══════════════════════════════════════════════════════════════════════
 // Manifest
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Component manifest — describes a component for composition and discovery.
+/// Component manifest — the structural surface for composition and discovery.
 #[pyclass(frozen, get_all)]
 #[derive(Debug, Clone)]
 pub struct Manifest {
-    pub kind: Kind,
     pub type_url: String,
-    pub description: String,
-    pub invoke: Option<String>,
+    pub source: String,
     pub requires: Vec<String>,
     pub provides: Vec<String>,
+    pub relations: HashMap<String, Vec<String>>,
 }
 
 #[pymethods]
 impl Manifest {
     #[new]
-    #[pyo3(signature = (kind, type_url, description, invoke=None, requires=None, provides=None))]
+    #[pyo3(signature = (type_url, source, requires=None, provides=None, relations=None))]
     fn new(
-        kind: Kind,
         type_url: String,
-        description: String,
-        invoke: Option<String>,
+        source: String,
         requires: Option<Vec<String>>,
         provides: Option<Vec<String>>,
+        relations: Option<HashMap<String, Vec<String>>>,
     ) -> Self {
         Self {
-            kind,
             type_url,
-            description,
-            invoke,
+            source,
             requires: requires.unwrap_or_default(),
             provides: provides.unwrap_or_default(),
+            relations: relations.unwrap_or_default(),
         }
     }
 
@@ -123,11 +57,7 @@ impl Manifest {
     }
 
     fn __repr__(&self) -> String {
-        format!(
-            "Manifest(kind={}, type_url={:?})",
-            self.kind.__str__(),
-            self.type_url
-        )
+        format!("Manifest(type_url={:?})", self.type_url)
     }
 }
 
@@ -163,23 +93,21 @@ impl TypedStruct {
 
 fn to_inner_manifest(m: &Manifest) -> slick::Manifest {
     slick::Manifest {
-        kind: m.kind.into(),
         type_url: m.type_url.clone(),
-        description: m.description.clone(),
-        invoke: m.invoke.clone(),
+        source: m.source.clone(),
         requires: m.requires.clone(),
         provides: m.provides.clone(),
+        relations: m.relations.clone(),
     }
 }
 
 fn from_inner_manifest(inner: slick::Manifest) -> Manifest {
     Manifest {
-        kind: inner.kind.into(),
         type_url: inner.type_url,
-        description: inner.description,
-        invoke: inner.invoke,
+        source: inner.source,
         requires: inner.requires,
         provides: inner.provides,
+        relations: inner.relations,
     }
 }
 
@@ -190,7 +118,6 @@ fn from_inner_manifest(inner: slick::Manifest) -> Manifest {
 /// Python module: `slickit._native`
 #[pymodule]
 fn _native(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<Kind>()?;
     m.add_class::<Manifest>()?;
     m.add_class::<TypedStruct>()?;
     Ok(())

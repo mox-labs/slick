@@ -1,6 +1,6 @@
 # slickit
 
-Semantic, LLM-Interpretable Component Kit. Foundation types for composable components across the mox ecosystem.
+Semantic, LLM-Interpretable Component Kit. Foundation types for composable components across the CIX ecosystem.
 
 **Package**: `slickit` on crates.io, PyPI, npm
 **Lib name**: `slick` (what you `use`)
@@ -12,14 +12,33 @@ Two layers, one crate:
 
 | Layer | Feature | Types |
 |-------|---------|-------|
-| Runtime | default | `TypedConfig`, `TypedRegistry`, `TypedRegistryBuilder`, `RegistryError` |
-| Authoring | `manifest` | `Kind`, `Manifest` |
+| Runtime | default | `TypedStruct`, `TypedRegistry`, `TypedRegistryBuilder`, `RegistryError` |
+| Authoring | `manifest` | `Manifest` |
 
-Bridge: `Manifest.type_url` = `TypedConfig.type_url`.
+Bridge: `Manifest.type_url` = `TypedStruct.type_url`.
+
+### MSG Framework
+
+| Layer | What | Where |
+|-------|------|-------|
+| **M (Mechanics)** | Manifest — structural surface | `slickit` core |
+| **S (Semantics)** | Skills — natural language judgment | Referenced via `relations["skills"]` |
+| **G (Governance)** | Trust, provenance, policies | External (CIX, x.uma) |
+
+### TypedStruct
+
+Typed structured data envelope. Isomorphic to xDS `TypedStruct`.
+
+```rust
+pub struct TypedStruct {
+    pub type_url: String,
+    pub value: serde_json::Value,
+}
+```
 
 ### TypedRegistry
 
-Generic `type_url → factory → instance`. Inspired by Envoy's `TypedExtensionConfig` + `FactoryRegistry`, but uses Rust's monomorphization + trait-on-type pattern instead of C++/JVM factory objects (see BoxedIntoFactory pattern in `~/oss/research/axum-mastery.md`).
+Generic `type_url → factory → instance`. Inspired by Envoy's `TypedExtensionConfig` + `FactoryRegistry`.
 
 - Builder pattern, immutable after `.build()`
 - `Send + Sync` factories
@@ -28,27 +47,25 @@ Generic `type_url → factory → instance`. Inspired by Envoy's `TypedExtension
 
 ### Manifest
 
-Component descriptor for composition and discovery:
+Five fields. Pure structure.
 
 ```rust
 pub struct Manifest {
-    pub kind: Kind,                 // Agent | Capability | Skill | Flow
-    pub type_url: String,           // globally unique identity
-    pub description: String,        // human + LLM readable
-    pub invoke: Option<String>,     // execution incantation, opaque to SLICK
-    pub requires: Vec<String>,      // input type_urls
-    pub provides: Vec<String>,      // output type_urls
+    pub type_url: String,                        // globally unique identity
+    pub source: String,                          // git URL or local path
+    pub requires: Vec<String>,                   // input port declarations
+    pub provides: Vec<String>,                   // output port declarations
+    pub relations: HashMap<String, Vec<String>>, // extensible typed edges
 }
 ```
 
-### The Four Kinds
+Well-known relation keys: `skills`, `tested_with`, `replaces`, `depends_on`.
 
-| Kind | Contract |
-|------|----------|
-| Agent | Autonomous reasoning, session-based |
-| Capability | Stateless function, single invocation |
-| Skill | Knowledge/context, no execution |
-| Flow | Orchestrated composition of components |
+Kind is convention in type_url namespace:
+- `cix.agents.*` → Agent
+- `cix.commands.*` → Capability
+- `cix.skills.*` → Skill
+- `cix.flows.*` → Flow
 
 ### Crusts
 
@@ -61,28 +78,40 @@ Rust is canonical. Crusts mirror.
 
 ## What SLICK Does NOT Own
 
-- No circuit/DAG types (geist-edge)
-- No circuit executor (geist-edge)
+- No execution runtime (geist-run)
+- No mediation layer (geist-edge)
 - No policy engine (x.uma)
-- No component protocol (geist-edge)
-- No skill content (convention: `invoke --skill`)
+- No component protocol (geist-run)
+- No skill content (referenced via relations, not stored)
+- No governance (external — CIX, x.uma)
 
 ## Conventions
 
 ### type_url
 
-Format: `<namespace>.<version>.<Resource>` — e.g., `mox.geist.processors.v1.AccessControl`
+Format: `<namespace>.<version>.<Resource>` — e.g., `cix.commands.v1.Recon`
 
-### Skill discovery
+### Namespacing
 
-Convention, not infrastructure:
-- Capability/Agent: `invoke --skill` outputs SKILL.md
-- Skill (Kind): the component IS the semantic surface
-- Flow: `SKILL.md` in repo by convention
+- `slick.*` — framework types (Manifest, TypedStruct)
+- `cix.*` — component ecosystem (commands, agents, flows, skills)
+- `<vendor>.*` — vendor components
 
-### invoke field
+### source
 
-Opaque to SLICK. Stores the execution incantation (e.g., `uvx mox/tools/recon`). SLICK stores it, never interprets it.
+Git URL or local path:
+- `git+https://github.com/mox-labs/tools/recon`
+- `git+https://github.com/mox-labs/tools/recon#v1.0.0` (pinned)
+- `./tools/recon` (local)
+
+### Skills
+
+Referenced via `relations["skills"]` as URIs:
+- `git+https://github.com/mox-labs/skills/recon`
+- `./skills/my-custom-skill`
+
+Convention: `--skill` flag outputs SKILL.md for greenfield components.
+Brownfield: set `relations.skills` explicitly.
 
 ## Downstream Consumers
 
@@ -90,13 +119,11 @@ Opaque to SLICK. Stores the execution incantation (e.g., `uvx mox/tools/recon`).
 |--------|------|----------|
 | geist-edge | `TypedRegistry` for processor registry | Rust |
 | x.uma/rumi | `TypedRegistry` for matcher/input/action registries | Rust |
-| x.uma/puma | `Manifest`, `Kind`, `TypedConfig` | Python (via slickit) |
-| x.uma/bumi | `Manifest`, `Kind`, `TypedConfig` | TypeScript (via slickit) |
+| x.uma/puma | `Manifest`, `TypedStruct` | Python (via slickit) |
+| x.uma/bumi | `Manifest`, `TypedStruct` | TypeScript (via slickit) |
 | Matrix | `Manifest` for component descriptions | Python (via slickit) |
 | mox.hud | `Manifest` for panel descriptors | TypeScript (via slickit) |
 | CIX | `Manifest` as component index | Python (via slickit) |
-
-Migration plans live in each project's `scratch/slick-migration.md`.
 
 ## Versioning
 
@@ -116,17 +143,7 @@ Triggers `.github/workflows/release.yml` → test gate → publishes to crates.i
 ## Testing
 
 ```bash
-cargo test --all-features    # 24 unit + 2 doc tests
+cargo test --all-features    # 22 tests
 cargo clippy --all-features  # lint
 cargo doc --all-features     # docs at target/doc/slick/
 ```
-
-## Guild Vocabulary
-
-| Guild Term | SLICK Equivalent |
-|------------|-----------------|
-| Boundary | Crust (PyO3/wasm-bindgen binding layer) |
-| Port | `TypedRegistry` (accepts any factory matching the type contract) |
-| Adapter | Factory closure registered via `.register()` |
-| Domain | `Kind` + `Manifest` (the component model) |
-| Valve | Not applicable (SLICK has no flow control) |
