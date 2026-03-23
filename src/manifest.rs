@@ -1,95 +1,62 @@
-//! SLICK component manifest — authoring-layer types.
+//! SLICK component manifest — the structural surface.
 //!
-//! These types describe components at authoring time: what kind they are,
-//! what they require and provide, and how to invoke them. The runtime layer
-//! ([`super::TypedConfig`], [`super::TypedRegistry`]) instantiates them.
+//! A Manifest is pure Mechanics in the MSG framework:
+//! - **M (Manifest)**: identity, source, ports, relations — structure
+//! - **S (Skills)**: referenced via `relations["skills"]` — natural language
+//! - **G (Governance)**: external (CIX, x.uma) — not on the Manifest
 //!
-//! | Layer | Types | Purpose |
-//! |-------|-------|---------|
-//! | Authoring | [`Manifest`], [`Kind`] | Describe + compose |
-//! | Runtime | [`super::TypedConfig`], [`super::TypedRegistry`] | Instantiate + run |
-//!
-//! Bridge: `Manifest.type_url` = `TypedConfig.type_url`.
-//!
-//! Cross-surface: the same [`Kind::Capability`] describes a Rust processor,
-//! a Svelte panel, or a Python function. Crusts (PyO3, wasm-bindgen) expose
-//! identical types to Python and TypeScript.
+//! Bridge: `Manifest.type_url` = `TypedStruct.type_url`.
 
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::collections::HashMap;
 
-/// The 4 component kinds. Each implies a different runtime contract.
+/// Component manifest — the structural surface for composition and discovery.
 ///
-/// | Kind | Contract | Example |
-/// |------|----------|---------|
-/// | [`Agent`](Self::Agent) | Autonomous reasoning, session-based | Code review agent |
-/// | [`Capability`](Self::Capability) | Stateless function, single invocation | AccessControl processor |
-/// | [`Skill`](Self::Skill) | Knowledge/context, no execution | Design tokens |
-/// | [`Flow`](Self::Flow) | Orchestrated DAG, artifact ledger | CI pipeline |
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Kind {
-    /// Autonomous reasoning with session state. Perceive → reason → act loop.
-    Agent,
-    /// Stateless, single invocation. Input → output, no session.
-    Capability,
-    /// Knowledge and context. Loaded into working memory, not executed.
-    Skill,
-    /// Orchestrated multi-step process. Composition with requires/provides contracts.
-    Flow,
-}
-
-impl fmt::Display for Kind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Agent => write!(f, "agent"),
-            Self::Capability => write!(f, "capability"),
-            Self::Skill => write!(f, "skill"),
-            Self::Flow => write!(f, "flow"),
-        }
-    }
-}
-
-/// Component manifest — describes a component for composition and discovery.
-///
-/// The `type_url` bridges to the runtime layer — it's the lookup key
-/// in [`super::TypedRegistry`]. The `invoke` field stores the execution
-/// incantation (e.g. a uvx command), opaque to SLICK.
+/// Five fields: identity (`type_url`), location (`source`), port declarations
+/// (`requires`, `provides`), and extensible typed edges (`relations`).
 ///
 /// # Example
 ///
 /// ```
-/// use slick::manifest::{Manifest, Kind};
+/// use slick::manifest::Manifest;
+/// use std::collections::HashMap;
 ///
 /// let manifest = Manifest {
-///     kind: Kind::Capability,
-///     type_url: "mox.geist.processors.v1.AccessControl".into(),
-///     description: "Deny-first access control processor".into(),
-///     invoke: Some("uvx mox/tools/access-control".into()),
-///     requires: vec![],
-///     provides: vec!["mox.geist.v1.AuthResult".into()],
+///     type_url: "cix.commands.v1.Recon".into(),
+///     source: "git+https://github.com/mox-labs/tools/recon".into(),
+///     requires: vec!["cix.v1.Target".into()],
+///     provides: vec!["cix.v1.ReconReport".into()],
+///     relations: HashMap::from([
+///         ("skills".into(), vec!["git+https://github.com/mox-labs/skills/recon".into()]),
+///     ]),
 /// };
 ///
-/// assert_eq!(manifest.kind, Kind::Capability);
-/// assert_eq!(manifest.type_url, "mox.geist.processors.v1.AccessControl");
+/// assert_eq!(manifest.type_url, "cix.commands.v1.Recon");
+/// assert_eq!(manifest.requires, vec!["cix.v1.Target"]);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Manifest {
-    /// Behavioral contract category.
-    pub kind: Kind,
-    /// Globally unique identity. Bridges to runtime layer.
+    /// Globally unique identity. Bridges to runtime layer via TypedStruct.type_url.
+    /// Format: `<namespace>.<version>.<Resource>`
     pub type_url: String,
-    /// Human + LLM readable description.
-    pub description: String,
-    /// Execution incantation (e.g. `uvx mox/tools/recon`). Opaque to SLICK.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub invoke: Option<String>,
-    /// Input type URLs this component requires.
-    #[serde(default)]
+
+    /// Where the component lives. Git URL, local path.
+    /// e.g., `git+https://github.com/mox-labs/tools/recon`, `./tools/recon`
+    pub source: String,
+
+    /// Input type_urls this component requires (port declarations).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub requires: Vec<String>,
-    /// Output type URLs this component provides. Empty for Skills (context only).
+
+    /// Output type_urls this component provides (port declarations).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub provides: Vec<String>,
+
+    /// Extensible typed relations. Convention-based keys.
+    /// Well-known: `skills`, `tested_with`, `replaces`, `depends_on`.
+    /// SLICK stores, never interprets.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub relations: HashMap<String, Vec<String>>,
 }
 
 #[cfg(test)]
@@ -97,133 +64,74 @@ mod tests {
     use super::*;
 
     #[test]
-    fn kind_display() {
-        assert_eq!(Kind::Agent.to_string(), "agent");
-        assert_eq!(Kind::Capability.to_string(), "capability");
-        assert_eq!(Kind::Skill.to_string(), "skill");
-        assert_eq!(Kind::Flow.to_string(), "flow");
-    }
-
-    #[test]
-    fn kind_serde_roundtrip() {
-        for kind in [Kind::Agent, Kind::Capability, Kind::Skill, Kind::Flow] {
-            let json = serde_json::to_string(&kind).unwrap();
-            let back: Kind = serde_json::from_str(&json).unwrap();
-            assert_eq!(kind, back);
-        }
-    }
-
-    #[test]
-    fn kind_deserializes_lowercase() {
-        assert_eq!(
-            serde_json::from_str::<Kind>(r#""agent""#).unwrap(),
-            Kind::Agent
-        );
-        assert_eq!(
-            serde_json::from_str::<Kind>(r#""capability""#).unwrap(),
-            Kind::Capability
-        );
-        assert_eq!(
-            serde_json::from_str::<Kind>(r#""skill""#).unwrap(),
-            Kind::Skill
-        );
-        assert_eq!(
-            serde_json::from_str::<Kind>(r#""flow""#).unwrap(),
-            Kind::Flow
-        );
-    }
-
-    #[test]
     fn manifest_serializes_roundtrip() {
         let manifest = Manifest {
-            kind: Kind::Capability,
-            type_url: "mox.geist.processors.v1.AccessControl".into(),
-            description: "Deny-first access control".into(),
-            invoke: Some("uvx mox/tools/access-control".into()),
-            requires: vec![],
-            provides: vec!["mox.geist.v1.AuthResult".into()],
+            type_url: "cix.commands.v1.Recon".into(),
+            source: "git+https://github.com/mox-labs/tools/recon".into(),
+            requires: vec!["cix.v1.Target".into()],
+            provides: vec!["cix.v1.ReconReport".into()],
+            relations: HashMap::from([
+                ("skills".into(), vec!["git+https://github.com/mox-labs/skills/recon".into()]),
+            ]),
         };
 
         let json = serde_json::to_string_pretty(&manifest).unwrap();
         let back: Manifest = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.kind, Kind::Capability);
-        assert_eq!(back.type_url, "mox.geist.processors.v1.AccessControl");
-        assert_eq!(back.invoke.as_deref(), Some("uvx mox/tools/access-control"));
-        assert_eq!(back.provides, vec!["mox.geist.v1.AuthResult"]);
+        assert_eq!(back.type_url, "cix.commands.v1.Recon");
+        assert_eq!(back.source, "git+https://github.com/mox-labs/tools/recon");
+        assert_eq!(back.requires, vec!["cix.v1.Target"]);
+        assert_eq!(back.provides, vec!["cix.v1.ReconReport"]);
+        assert_eq!(
+            back.relations.get("skills").unwrap(),
+            &vec!["git+https://github.com/mox-labs/skills/recon"]
+        );
     }
 
     #[test]
-    fn manifest_minimal_fields() {
+    fn manifest_minimal() {
         let json = r#"{
-            "kind": "skill",
-            "type_url": "slick.v1.RustMastery",
-            "description": "Rust architectural judgment"
+            "type_url": "cix.skills.v1.RustMastery",
+            "source": "git+https://github.com/mox-labs/skills/rust-mastery"
         }"#;
         let manifest: Manifest = serde_json::from_str(json).unwrap();
-        assert_eq!(manifest.kind, Kind::Skill);
-        assert!(manifest.invoke.is_none());
+        assert_eq!(manifest.type_url, "cix.skills.v1.RustMastery");
         assert!(manifest.requires.is_empty());
         assert!(manifest.provides.is_empty());
+        assert!(manifest.relations.is_empty());
     }
 
     #[test]
-    fn agent_manifest() {
+    fn manifest_with_relations() {
         let manifest = Manifest {
-            kind: Kind::Agent,
-            type_url: "mox.hud.adapters.v1.Cloudflare".into(),
-            description: "Cloudflare runtime adapter".into(),
-            invoke: Some("uvx mox/tools/cloudflare-adapter".into()),
+            type_url: "cix.commands.v1.HttpClient".into(),
+            source: "./tools/http-client".into(),
             requires: vec![],
-            provides: vec!["mox.hud.v1.Plane".into()],
-        };
-        assert_eq!(manifest.kind, Kind::Agent);
-        assert!(manifest.invoke.is_some());
-    }
-
-    #[test]
-    fn flow_manifest_with_requires_provides() {
-        let manifest = Manifest {
-            kind: Kind::Flow,
-            type_url: "ix.v1.ExperimentFlow".into(),
-            description: "Probe → trial → sensor → reading".into(),
-            invoke: None,
-            requires: vec!["ix.v1.Probes".into(), "ix.v1.Subject".into()],
-            provides: vec!["ix.v1.Readings".into()],
+            provides: vec!["cix.v1.HttpResponse".into()],
+            relations: HashMap::from([
+                ("skills".into(), vec!["./skills/http-patterns.md".into()]),
+                ("tested_with".into(), vec!["cix.flows.v1.ApiPipeline".into()]),
+                ("replaces".into(), vec!["cix.commands.v0.OldHttpClient".into()]),
+            ]),
         };
 
-        assert_eq!(manifest.requires.len(), 2);
-        assert_eq!(manifest.provides, vec!["ix.v1.Readings"]);
-        assert!(manifest.invoke.is_none()); // Flows are config, not CLI tools
-    }
-
-    #[test]
-    fn capability_manifest() {
-        let manifest = Manifest {
-            kind: Kind::Capability,
-            type_url: "mox.hud.panels.v1.NavPanel".into(),
-            description: "File tree explorer panel".into(),
-            invoke: None,
-            requires: vec!["mox.hud.v1.Plane".into()],
-            provides: vec!["mox.hud.v1.PanelRender".into()],
-        };
-
-        assert_eq!(manifest.kind, Kind::Capability);
-        assert_eq!(manifest.requires.len(), 1);
+        assert_eq!(manifest.relations.len(), 3);
+        assert!(manifest.relations.contains_key("skills"));
+        assert!(manifest.relations.contains_key("tested_with"));
+        assert!(manifest.relations.contains_key("replaces"));
     }
 
     #[test]
     fn cross_surface_type_url_is_bridge() {
         let manifest = Manifest {
-            kind: Kind::Capability,
-            type_url: "mox.geist.processors.v1.AccessControl".into(),
-            description: "Access control".into(),
-            invoke: None,
+            type_url: "cix.commands.v1.AccessControl".into(),
+            source: "git+https://github.com/mox-labs/tools/acl".into(),
             requires: vec![],
             provides: vec![],
+            relations: HashMap::new(),
         };
 
         let ts = crate::TypedStruct {
-            type_url: "mox.geist.processors.v1.AccessControl".into(),
+            type_url: "cix.commands.v1.AccessControl".into(),
             value: serde_json::json!({"default_action": "deny"}),
         };
 
@@ -231,18 +139,34 @@ mod tests {
     }
 
     #[test]
-    fn invoke_skipped_when_none() {
+    fn empty_relations_skipped_in_json() {
         let manifest = Manifest {
-            kind: Kind::Skill,
-            type_url: "slick.v1.DesignTokens".into(),
-            description: "Brand design tokens".into(),
-            invoke: None,
+            type_url: "cix.skills.v1.Patterns".into(),
+            source: "./skills/patterns".into(),
             requires: vec![],
             provides: vec![],
+            relations: HashMap::new(),
         };
 
         let json = serde_json::to_string(&manifest).unwrap();
-        assert!(!json.contains("invoke"));
+        assert!(!json.contains("relations"));
+        assert!(!json.contains("requires"));
         assert!(!json.contains("provides"));
+    }
+
+    #[test]
+    fn flow_manifest() {
+        let manifest = Manifest {
+            type_url: "cix.flows.v1.SecurePipeline".into(),
+            source: "git+https://github.com/mox-labs/flows/secure-pipeline".into(),
+            requires: vec!["cix.v1.Target".into(), "cix.v1.Credentials".into()],
+            provides: vec!["cix.v1.SecureReport".into()],
+            relations: HashMap::from([
+                ("skills".into(), vec!["git+https://github.com/mox-labs/skills/security".into()]),
+            ]),
+        };
+
+        assert_eq!(manifest.requires.len(), 2);
+        assert_eq!(manifest.provides.len(), 1);
     }
 }
