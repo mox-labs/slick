@@ -9,7 +9,7 @@ Semantic, LLM-Interpretable Component Kit. Foundation types for composable compo
 Create a `manifest.yaml`:
 
 ```yaml
-type_url: cix.commands.v1.MyTool
+type_url: cix.capability.v1.MyTool
 source: git+https://github.com/you/my-tool
 requires: [cix.v1.Input]
 provides: [cix.v1.Output]
@@ -28,7 +28,7 @@ Write a `SKILL.md` — natural language context for LLM composition:
 
 Use when you need to transform Input into Output.
 Handles edge cases X and Y. Fails on Z — use OtherTool for that.
-Composes well with cix.commands.v1.Validator as a pre-step.
+Composes well with cix.capability.v1.Validator as a pre-step.
 ```
 
 The Manifest is the structural surface (what). The Skill is the semantic surface (when, why, how).
@@ -78,7 +78,7 @@ use slick::{Manifest, TypedStruct, TypedRegistryBuilder};
 use std::collections::HashMap;
 
 let manifest = Manifest {
-    type_url: "cix.commands.v1.Recon".into(),
+    type_url: "cix.capability.v1.Recon".into(),
     source: "git+https://github.com/mox-labs/tools/recon".into(),
     requires: vec!["cix.v1.Target".into()],
     provides: vec!["cix.v1.ReconReport".into()],
@@ -103,7 +103,7 @@ let instance = registry.create("example.v1", &serde_json::json!("hello")).unwrap
 from slickit import Manifest, TypedStruct
 
 manifest = Manifest(
-    type_url="cix.commands.v1.Recon",
+    type_url="cix.capability.v1.Recon",
     source="git+https://github.com/mox-labs/tools/recon",
     requires=["cix.v1.Target"],
     provides=["cix.v1.ReconReport"],
@@ -120,7 +120,7 @@ manifest2 = Manifest.from_json(json_str)
 import { Manifest } from "slickit";
 
 const manifest = Manifest.fromObject({
-    type_url: "cix.commands.v1.Recon",
+    type_url: "cix.capability.v1.Recon",
     source: "git+https://github.com/mox-labs/tools/recon",
     requires: ["cix.v1.Target"],
     provides: ["cix.v1.ReconReport"],
@@ -134,7 +134,7 @@ Five fields. Pure structure.
 
 | Field | What | Example |
 |-------|------|---------|
-| **type_url** | Globally unique identity | `cix.commands.v1.Recon` |
+| **type_url** | Globally unique identity | `cix.capability.v1.Recon` |
 | **source** | Where it lives | `git+https://github.com/mox-labs/tools/recon` |
 | **requires** | Input port declarations | `[cix.v1.Target]` |
 | **provides** | Output port declarations | `[cix.v1.ReconReport]` |
@@ -144,7 +144,7 @@ Kind is convention in the type_url namespace:
 
 | Namespace | Kind |
 |-----------|------|
-| `cix.commands.*` | Capability (stateless, input → output) |
+| `cix.capability.*` | Capability (stateless, input → output) |
 | `cix.agents.*` | Agent (autonomous, session-based) |
 | `cix.skills.*` | Skill (knowledge, no execution) |
 | `cix.flows.*` | Flow (composition of components) |
